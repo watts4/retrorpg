@@ -1,0 +1,15 @@
+{
+  "files": {
+    "main.css": "/retrorpg/static/css/main.b2aaf27e.css",
+    "main.js": "/retrorpg/static/js/main.c3552854.js",
+    "static/js/453.ab0ba2a4.chunk.js": "/retrorpg/static/js/453.ab0ba2a4.chunk.js",
+    "index.html": "/retrorpg/index.html",
+    "main.b2aaf27e.css.map": "/retrorpg/static/css/main.b2aaf27e.css.map",
+    "main.c3552854.js.map": "/retrorpg/static/js/main.c3552854.js.map",
+    "453.ab0ba2a4.chunk.js.map": "/retrorpg/static/js/453.ab0ba2a4.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.b2aaf27e.css",
+    "static/js/main.c3552854.js"
+  ]
+}
