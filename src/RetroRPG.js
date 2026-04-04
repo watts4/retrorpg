@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, Sword, Shield, Book, Coins, Heart, Clock, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Home } from 'lucide-react';
+import { Sword, Shield, Coins, Heart, Clock, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Home } from 'lucide-react';
 
 // Game constants
 const TILE_TYPES = {
