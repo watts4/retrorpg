@@ -57,7 +57,12 @@ const RetroRPG = () => {
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [innOptions, setInnOptions] = useState(true);
   const [gameTime, setGameTime] = useState(0);
-  const [saveGames, setSaveGames] = useState([]);
+  const [saveGames, setSaveGames] = useState(() => {
+    try {
+      const saved = localStorage.getItem('retrorpg_saves');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
   
   // Images for different scenes
   const sceneImages = {
@@ -700,13 +705,31 @@ const RetroRPG = () => {
       newInventory.push({ ...item });
     }
     
+    let attackBonus = 0;
+    let defenseBonus = 0;
+    const newEquipment = { ...player.equipment };
+
+    if (item.type === 'weapon') {
+      if (newEquipment.weapon) attackBonus -= newEquipment.weapon.attack || 0;
+      newEquipment.weapon = item;
+      attackBonus += item.attack || 0;
+    } else if (item.type === 'armor') {
+      if (newEquipment.armor) defenseBonus -= newEquipment.armor.defense || 0;
+      newEquipment.armor = item;
+      defenseBonus += item.defense || 0;
+    }
+
     setPlayer(prev => ({
       ...prev,
       gold: prev.gold - item.price,
-      inventory: newInventory
+      inventory: newInventory,
+      equipment: newEquipment,
+      attack: prev.attack + attackBonus,
+      defense: prev.defense + defenseBonus
     }));
-    
-    addToGameLog(`You bought a ${item.name} for ${item.price} gold.`);
+
+    const equipped = item.type === 'weapon' || item.type === 'armor' ? ' and equipped it' : '';
+    addToGameLog(`You bought a ${item.name} for ${item.price} gold${equipped}.`);
   };
   
   // Open library
@@ -792,7 +815,8 @@ const RetroRPG = () => {
     
     const newSaveGames = [...saveGames, saveData];
     setSaveGames(newSaveGames);
-    
+    localStorage.setItem('retrorpg_saves', JSON.stringify(newSaveGames));
+
     addToGameLog('Game saved successfully!');
   };
   
