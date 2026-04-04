@@ -823,7 +823,8 @@ const RetroRPG = () => {
   // Load game
   const loadGame = (index) => {
     const saveData = saveGames[index];
-    
+    if (!saveData) return;
+
     setPlayer(saveData.player);
     setGameMap(saveData.gameMap);
     setPlayerPosition(saveData.playerPosition);
