@@ -57,7 +57,13 @@ const RetroRPG = () => {
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [innOptions, setInnOptions] = useState(true);
   const [gameTime, setGameTime] = useState(0);
-  const [saveGames, setSaveGames] = useState([]);
+  const [saveGames, setSaveGames] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('retrorpg_saves')) || [];
+    } catch {
+      return [];
+    }
+  });
   
   // Images for different scenes
   const sceneImages = {
@@ -792,14 +798,16 @@ const RetroRPG = () => {
     
     const newSaveGames = [...saveGames, saveData];
     setSaveGames(newSaveGames);
-    
+    localStorage.setItem('retrorpg_saves', JSON.stringify(newSaveGames));
+
     addToGameLog('Game saved successfully!');
   };
   
   // Load game
   const loadGame = (index) => {
     const saveData = saveGames[index];
-    
+    if (!saveData) return;
+
     setPlayer(saveData.player);
     setGameMap(saveData.gameMap);
     setPlayerPosition(saveData.playerPosition);
