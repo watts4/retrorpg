@@ -671,7 +671,7 @@ const RetroRPG = () => {
   
   // Open shop
   const openShop = () => {
-	    setShopOpen(true);
+    setShopOpen(true);
     setLibraryOpen(false);
     setInnOptions(false);
     addToGameLog('Welcome to the shop! What would you like to buy?');
