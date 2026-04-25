@@ -46,7 +46,7 @@ const RetroRPG = () => {
   });
   
   const [gameMap, setGameMap] = useState([]);
-  const [mapSize, setMapSize] = useState({ width: 15, height: 15 });
+  const [mapSize] = useState({ width: 15, height: 15 });
   const [playerPosition, setPlayerPosition] = useState({ x: 7, y: 7 });
   const [currentLocation, setCurrentLocation] = useState(LOCATIONS.INN);
   const [gameLog, setGameLog] = useState(['Welcome to the Mystic Realms! You find yourself at the cozy Wanderer\'s Inn.']);
@@ -63,20 +63,6 @@ const RetroRPG = () => {
       return saved ? JSON.parse(saved) : [];
     } catch { return []; }
   });
-  
-  // Images for different scenes
-  const sceneImages = {
-    inn: 'https://cdnjs.cloudflare.com/ajax/libs/placeholders/0.0.1/img/placeholder.svg',
-    path: 'https://cdnjs.cloudflare.com/ajax/libs/placeholders/0.0.1/img/placeholder.svg',
-    wall: 'https://cdnjs.cloudflare.com/ajax/libs/placeholders/0.0.1/img/placeholder.svg',
-    dungeonEntrance: 'https://cdnjs.cloudflare.com/ajax/libs/placeholders/0.0.1/img/placeholder.svg',
-    dungeonPath: 'https://cdnjs.cloudflare.com/ajax/libs/placeholders/0.0.1/img/placeholder.svg',
-    dungeonWall: 'https://cdnjs.cloudflare.com/ajax/libs/placeholders/0.0.1/img/placeholder.svg',
-    treasure: 'https://cdnjs.cloudflare.com/ajax/libs/placeholders/0.0.1/img/placeholder.svg',
-    boss: 'https://cdnjs.cloudflare.com/ajax/libs/placeholders/0.0.1/img/placeholder.svg',
-    enemy: 'https://cdnjs.cloudflare.com/ajax/libs/placeholders/0.0.1/img/placeholder.svg',
-    event: 'https://cdnjs.cloudflare.com/ajax/libs/placeholders/0.0.1/img/placeholder.svg'
-  };
   
   // Shop items
   const shopItems = [
@@ -120,6 +106,7 @@ const RetroRPG = () => {
   // Initialize game
   useEffect(() => {
     initializeGame();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   
   // Handle keyboard input
@@ -152,6 +139,7 @@ const RetroRPG = () => {
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playerPosition, gameMap, currentLocation, inCombat, shopOpen, libraryOpen]);
   
   // Game clock
@@ -209,8 +197,10 @@ const RetroRPG = () => {
           case 3: // West
             currentX = Math.max(1, currentX - 1);
             break;
+          default:
+            break;
         }
-        
+
         // Set the tile to path
         map[currentY][currentX] = TILE_TYPES.PATH;
         
@@ -234,8 +224,10 @@ const RetroRPG = () => {
             case 3: // West
               branchX = Math.max(1, branchX - 1);
               break;
+            default:
+              break;
           }
-          
+
           if (map[branchY][branchX] === TILE_TYPES.WALL) {
             map[branchY][branchX] = TILE_TYPES.PATH;
           }
@@ -303,6 +295,8 @@ const RetroRPG = () => {
         case 3: // West
           newX = Math.max(1, currentX - 1);
           break;
+        default:
+          break;
       }
       
       // If we haven't visited this tile yet
@@ -330,11 +324,13 @@ const RetroRPG = () => {
             case 3: // West
               branchX = Math.max(1, branchX - 1);
               break;
+            default:
+              break;
           }
-          
+
           if (map[branchY][branchX] === TILE_TYPES.WALL) {
             map[branchY][branchX] = TILE_TYPES.PATH;
-            
+
             // Sometimes extend the branch
             if (Math.random() < 0.5) {
               let branchX2 = branchX;
@@ -352,6 +348,8 @@ const RetroRPG = () => {
                   break;
                 case 3: // West
                   branchX2 = Math.max(1, branchX2 - 1);
+                  break;
+                default:
                   break;
               }
               
@@ -1077,64 +1075,6 @@ const RetroRPG = () => {
     setGameLog(prev => [...prev, message]);
   };
   
-  // Get current view image
-  const getCurrentImage = () => {
-    if (inCombat) {
-      return enemy ? sceneImages[enemy.image] : sceneImages.path;
-    }
-    
-    if (shopOpen || libraryOpen) {
-      return sceneImages.inn;
-    }
-    
-    if (currentLocation === LOCATIONS.INN) {
-      return sceneImages.inn;
-    }
-    
-    if (currentLocation === LOCATIONS.DUNGEON) {
-      const tileType = gameMap[playerPosition.y][playerPosition.x];
-      
-      switch (tileType) {
-        case TILE_TYPES.DUNGEON_EXIT:
-          return sceneImages.dungeonEntrance;
-        case TILE_TYPES.PATH:
-          return sceneImages.dungeonPath;
-        case TILE_TYPES.WALL:
-          return sceneImages.dungeonWall;
-        case TILE_TYPES.BOSS:
-          return sceneImages.boss;
-        case TILE_TYPES.TREASURE:
-          return sceneImages.treasure;
-        case TILE_TYPES.ENEMY:
-          return sceneImages.enemy;
-        case TILE_TYPES.EVENT:
-          return sceneImages.event;
-        default:
-          return sceneImages.dungeonPath;
-      }
-    }
-    
-    // Town
-    const tileType = gameMap[playerPosition.y][playerPosition.x];
-    
-    switch (tileType) {
-      case TILE_TYPES.INN:
-        return sceneImages.inn;
-      case TILE_TYPES.PATH:
-        return sceneImages.path;
-      case TILE_TYPES.WALL:
-        return sceneImages.wall;
-      case TILE_TYPES.DUNGEON_ENTRANCE:
-        return sceneImages.dungeonEntrance;
-      case TILE_TYPES.EVENT:
-        return sceneImages.event;
-      case TILE_TYPES.ENEMY:
-        return sceneImages.enemy;
-      default:
-        return sceneImages.path;
-    }
-  };
-
   return (
     <div className="flex flex-col h-screen max-h-screen bg-gray-900 text-white">
       {/* Header */}
