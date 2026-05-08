@@ -703,18 +703,30 @@ const RetroRPG = () => {
       newInventory.push({ ...item });
     }
     
+    // Auto-equip weapons/armor only when the slot is empty OR the new item is
+    // a strict upgrade. A weaker purchase goes into inventory and the player
+    // keeps wielding what they had.
     let attackBonus = 0;
     let defenseBonus = 0;
+    let didEquip = false;
     const newEquipment = { ...player.equipment };
 
     if (item.type === 'weapon') {
-      if (newEquipment.weapon) attackBonus -= newEquipment.weapon.attack || 0;
-      newEquipment.weapon = item;
-      attackBonus += item.attack || 0;
+      const currentAttack = newEquipment.weapon ? (newEquipment.weapon.attack || 0) : 0;
+      const newAttack = item.attack || 0;
+      if (!newEquipment.weapon || newAttack > currentAttack) {
+        attackBonus = newAttack - currentAttack;
+        newEquipment.weapon = item;
+        didEquip = true;
+      }
     } else if (item.type === 'armor') {
-      if (newEquipment.armor) defenseBonus -= newEquipment.armor.defense || 0;
-      newEquipment.armor = item;
-      defenseBonus += item.defense || 0;
+      const currentDefense = newEquipment.armor ? (newEquipment.armor.defense || 0) : 0;
+      const newDefense = item.defense || 0;
+      if (!newEquipment.armor || newDefense > currentDefense) {
+        defenseBonus = newDefense - currentDefense;
+        newEquipment.armor = item;
+        didEquip = true;
+      }
     }
 
     setPlayer(prev => ({
@@ -726,8 +738,11 @@ const RetroRPG = () => {
       defense: prev.defense + defenseBonus
     }));
 
-    const equipped = item.type === 'weapon' || item.type === 'armor' ? ' and equipped it' : '';
-    addToGameLog(`You bought a ${item.name} for ${item.price} gold${equipped}.`);
+    let suffix = '';
+    if (item.type === 'weapon' || item.type === 'armor') {
+      suffix = didEquip ? ' and equipped it' : ' (kept in inventory; your current gear is stronger)';
+    }
+    addToGameLog(`You bought a ${item.name} for ${item.price} gold${suffix}.`);
   };
   
   // Open library
