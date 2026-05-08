@@ -800,7 +800,9 @@ const RetroRPG = () => {
     addToGameLog('You rest at the inn and recover all your HP.');
   };
   
-  // Save game
+  // Save game — cap at MAX_SAVE_SLOTS, dropping the oldest when full so
+  // localStorage doesn't accumulate every session forever.
+  const MAX_SAVE_SLOTS = 5;
   const saveGame = () => {
     const saveData = {
       player,
@@ -810,12 +812,16 @@ const RetroRPG = () => {
       gameTime,
       timestamp: new Date().toLocaleString()
     };
-    
-    const newSaveGames = [...saveGames, saveData];
+
+    const appended = [...saveGames, saveData];
+    const newSaveGames = appended.slice(-MAX_SAVE_SLOTS);
     setSaveGames(newSaveGames);
     localStorage.setItem('retrorpg_saves', JSON.stringify(newSaveGames));
 
-    addToGameLog('Game saved successfully!');
+    const droppedOldest = appended.length > MAX_SAVE_SLOTS;
+    addToGameLog(droppedOldest
+      ? `Game saved successfully (oldest save dropped; ${MAX_SAVE_SLOTS} slot cap).`
+      : 'Game saved successfully!');
   };
   
   // Load game
@@ -1070,9 +1076,14 @@ const RetroRPG = () => {
     returnToInn();
   };
   
-  // Add to game log
+  // Add to game log — trim to the last MAX_LOG_ENTRIES so memory doesn't grow
+  // without bound (only the most recent ~10 are rendered anyway).
+  const MAX_LOG_ENTRIES = 50;
   const addToGameLog = (message) => {
-    setGameLog(prev => [...prev, message]);
+    setGameLog(prev => {
+      const next = [...prev, message];
+      return next.length > MAX_LOG_ENTRIES ? next.slice(-MAX_LOG_ENTRIES) : next;
+    });
   };
   
   return (
