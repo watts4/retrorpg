@@ -42,8 +42,17 @@ const RetroRPG = () => {
     nextLevelExp: 100,
     inventory: [{ name: 'Inn Portal Scroll', type: 'scroll', quantity: 3 }],
     spells: [],
-    equipment: { weapon: null, armor: null, accessory: null }
+    equipment: { weapon: null, armor: null, accessory: null },
+    // Library-book reward flags. These are wired into combat/UI; see readBook
+    // and the combat panel below.
+    knowsWeaknesses: false,
+    canSeeMap: false
   });
+
+  // Per-rest spell uses. We didn't add a full mana system; instead each known
+  // spell is castable once between rests at the inn. The map is keyed by
+  // spell name so multiple copies of the same spell don't stack uses.
+  const [spellsUsed, setSpellsUsed] = useState({});
   
   const [gameMap, setGameMap] = useState([]);
   const [mapSize] = useState({ width: 15, height: 15 });
@@ -768,35 +777,52 @@ const RetroRPG = () => {
     }
     
     let rewardText = '';
-    
-    // Apply book reward
+
+    // Apply book reward. Each branch wires a real gameplay effect:
+    //  - spell: appended to player.spells; the combat panel renders a Cast
+    //    button per spell, and casting deals spell.damage.
+    //  - knowledge: sets player.knowsWeaknesses; combat HUD then reveals the
+    //    enemy's hp/attack/defense.
+    //  - ability seeMap: sets player.canSeeMap; sidebar renders a minimap.
     if (book.reward.type === 'spell') {
-      // Add spell
-      const newSpells = [...player.spells];
-      newSpells.push(book.reward.spell);
-      
+      // Don't double-learn the same spell.
+      const alreadyKnown = player.spells.some(s => s.name === book.reward.spell.name);
+      if (alreadyKnown) {
+        addToGameLog(`You already know ${book.reward.spell.name}.`);
+        return;
+      }
+      const newSpells = [...player.spells, book.reward.spell];
+
       setPlayer(prev => ({
         ...prev,
         gold: prev.gold - book.cost,
         spells: newSpells
       }));
-      
+
       rewardText = `You learned the ${book.reward.spell.name} spell!`;
     } else if (book.reward.type === 'knowledge') {
-      // Add knowledge benefit
+      if (player.knowsWeaknesses) {
+        addToGameLog('You already know that lore.');
+        return;
+      }
       setPlayer(prev => ({
         ...prev,
-        gold: prev.gold - book.cost
+        gold: prev.gold - book.cost,
+        knowsWeaknesses: true
       }));
-      
+
       rewardText = `You gained valuable knowledge: ${book.reward.description}`;
     } else if (book.reward.type === 'ability') {
-      // Add ability
+      if (book.reward.ability === 'seeMap' && player.canSeeMap) {
+        addToGameLog('You already know how to read maps.');
+        return;
+      }
       setPlayer(prev => ({
         ...prev,
-        gold: prev.gold - book.cost
+        gold: prev.gold - book.cost,
+        ...(book.reward.ability === 'seeMap' ? { canSeeMap: true } : {})
       }));
-      
+
       rewardText = 'You learned how to read maps. You can now see more of your surroundings.';
     }
     
@@ -811,7 +837,10 @@ const RetroRPG = () => {
       ...prev,
       hp: prev.maxHp
     }));
-    
+    // Resting also restores the player's ability to cast each known spell
+    // again — see castSpell for the once-per-rest cooldown model.
+    setSpellsUsed({});
+
     addToGameLog('You rest at the inn and recover all your HP.');
   };
   
@@ -844,7 +873,13 @@ const RetroRPG = () => {
     const saveData = saveGames[index];
     if (!saveData) return;
 
-    setPlayer(saveData.player);
+    // Default any new flags so older saves don't lose them as `undefined`.
+    setPlayer({
+      knowsWeaknesses: false,
+      canSeeMap: false,
+      ...saveData.player
+    });
+    setSpellsUsed({});
     setGameMap(saveData.gameMap);
     setPlayerPosition(saveData.playerPosition);
     setCurrentLocation(saveData.currentLocation);
@@ -1010,6 +1045,89 @@ const RetroRPG = () => {
     }
   };
   
+  // Cast a learned spell during combat. We don't have a mana system, so each
+  // spell is usable once per "rest" — uses reset in restAtInn. Spell damage
+  // bypasses enemy defense (it's magic) but still triggers an enemy
+  // counter-attack like Attack/Use Potion.
+  const castSpell = (spell) => {
+    if (!inCombat || !enemy) return;
+    if (spellsUsed[spell.name]) {
+      addToGameLog(`You're too drained to cast ${spell.name} again. Rest at the inn first.`);
+      return;
+    }
+
+    const spellDamage = spell.damage || 0;
+    const enemyHp = enemy.hp - spellDamage;
+
+    addToGameLog(`You cast ${spell.name} for ${spellDamage} damage!`);
+    setSpellsUsed(prev => ({ ...prev, [spell.name]: true }));
+
+    if (enemyHp <= 0) {
+      // Enemy defeated by spell — share the same loot/level path as attackEnemy.
+      addToGameLog(`You defeated the ${enemy.name}!`);
+      addToGameLog(`You gained ${enemy.exp} experience and ${enemy.gold} gold.`);
+
+      const newExp = player.exp + enemy.exp;
+      let newLevel = player.level;
+      let newNextLevelExp = player.nextLevelExp;
+
+      if (newExp >= player.nextLevelExp) {
+        newLevel++;
+        newNextLevelExp = Math.floor(player.nextLevelExp * 1.5);
+        setPlayer(prev => ({
+          ...prev,
+          level: newLevel,
+          maxHp: prev.maxHp + 5,
+          hp: prev.hp + 5,
+          attack: prev.attack + 2,
+          defense: prev.defense + 1,
+          exp: newExp,
+          nextLevelExp: newNextLevelExp,
+          gold: prev.gold + enemy.gold
+        }));
+        addToGameLog(`Congratulations! You reached level ${newLevel}!`);
+        addToGameLog('Your stats have increased!');
+      } else {
+        setPlayer(prev => ({
+          ...prev,
+          exp: newExp,
+          gold: prev.gold + enemy.gold
+        }));
+      }
+
+      setInCombat(false);
+      setEnemy(null);
+
+      if (enemy.name === bossTemplates[0].name ||
+          enemy.name === bossTemplates[1].name ||
+          enemy.name === bossTemplates[2].name) {
+        const newMap = [...gameMap];
+        newMap[playerPosition.y][playerPosition.x] = TILE_TYPES.PATH;
+        setGameMap(newMap);
+      }
+
+      setCurrentScene(currentLocation === LOCATIONS.DUNGEON ? 'dungeonPath' : 'path');
+      return;
+    }
+
+    // Enemy survives — counter-attack.
+    setEnemy({ ...enemy, hp: enemyHp });
+    const enemyDamage = Math.max(1, enemy.attack - player.defense);
+    const playerHp = player.hp - enemyDamage;
+    addToGameLog(`The ${enemy.name} attacks you for ${enemyDamage} damage!`);
+
+    if (playerHp <= 0) {
+      addToGameLog('You have been defeated!');
+      setPlayer(prev => ({
+        ...prev,
+        hp: Math.max(1, Math.floor(prev.maxHp * 0.5))
+      }));
+      returnToInn();
+    } else {
+      setPlayer(prev => ({ ...prev, hp: playerHp }));
+    }
+  };
+
   // Run from combat
   const runFromCombat = () => {
     if (!inCombat || !enemy) return;
@@ -1161,25 +1279,64 @@ const RetroRPG = () => {
           {/* Action controls */}
           <div className="w-full max-w-xl mt-4">
             {inCombat ? (
-              <div className="grid grid-cols-3 gap-2">
-                <button 
-                  onClick={attackEnemy}
-                  className="bg-red-700 hover:bg-red-600 text-white font-bold py-2 px-4 rounded"
-                >
-                  Attack
-                </button>
-                <button 
-                  onClick={consumePotion}
-                  className="bg-green-700 hover:bg-green-600 text-white font-bold py-2 px-4 rounded"
-                >
-                  Use Potion
-                </button>
-                <button 
-                  onClick={runFromCombat}
-                  className="bg-blue-700 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded"
-                >
-                  Run
-                </button>
+              <div className="space-y-2">
+                {/* Enemy HUD: name always shown; stats revealed only if the
+                    player has read the Monster Compendium. */}
+                {enemy && (
+                  <div className="bg-gray-800 border border-gray-700 rounded p-2 text-sm">
+                    <div className="flex justify-between font-bold">
+                      <span>{enemy.name}</span>
+                      {player.knowsWeaknesses && <span>HP {enemy.hp}</span>}
+                    </div>
+                    {player.knowsWeaknesses && (
+                      <div className="flex justify-between text-xs text-gray-300 mt-1">
+                        <span>ATK {enemy.attack}</span>
+                        <span>DEF {enemy.defense}</span>
+                        <span>EXP {enemy.exp}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    onClick={attackEnemy}
+                    className="bg-red-700 hover:bg-red-600 text-white font-bold py-2 px-4 rounded"
+                  >
+                    Attack
+                  </button>
+                  <button
+                    onClick={consumePotion}
+                    className="bg-green-700 hover:bg-green-600 text-white font-bold py-2 px-4 rounded"
+                  >
+                    Use Potion
+                  </button>
+                  <button
+                    onClick={runFromCombat}
+                    className="bg-blue-700 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded"
+                  >
+                    Run
+                  </button>
+                </div>
+                {/* Spells: one Cast button per learned spell. Disabled while
+                    on cooldown (used since last rest). */}
+                {player.spells.length > 0 && (
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    {player.spells.map((spell, idx) => {
+                      const used = !!spellsUsed[spell.name];
+                      return (
+                        <button
+                          key={idx}
+                          onClick={() => castSpell(spell)}
+                          disabled={used}
+                          className={`bg-purple-700 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded flex justify-between ${used ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          <span>Cast {spell.name}</span>
+                          <span>{spell.damage} dmg</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             ) : shopOpen ? (
               <div className="space-y-2">
@@ -1356,7 +1513,38 @@ const RetroRPG = () => {
                 )}
               </div>
             </div>
-            
+
+            {/* Minimap: only rendered after the player has bought the
+                Map Reading book. Each tile is a 1x1 colored cell; player
+                position is highlighted. */}
+            {player.canSeeMap && gameMap.length > 0 && (
+              <div>
+                <h3 className="font-bold mb-1 text-gray-400">Map</h3>
+                <div
+                  className="grid gap-px bg-gray-900 p-1 rounded"
+                  style={{ gridTemplateColumns: `repeat(${mapSize.width}, minmax(0, 1fr))` }}
+                >
+                  {gameMap.map((row, y) =>
+                    row.map((tile, x) => {
+                      const isPlayer = x === playerPosition.x && y === playerPosition.y;
+                      let bg = 'bg-gray-800';
+                      if (isPlayer) bg = 'bg-yellow-400';
+                      else if (tile === TILE_TYPES.WALL) bg = 'bg-gray-700';
+                      else if (tile === TILE_TYPES.PATH) bg = 'bg-gray-500';
+                      else if (tile === TILE_TYPES.INN) bg = 'bg-green-500';
+                      else if (tile === TILE_TYPES.DUNGEON_ENTRANCE) bg = 'bg-purple-500';
+                      else if (tile === TILE_TYPES.DUNGEON_EXIT) bg = 'bg-blue-500';
+                      else if (tile === TILE_TYPES.BOSS) bg = 'bg-red-700';
+                      else if (tile === TILE_TYPES.TREASURE) bg = 'bg-yellow-600';
+                      else if (tile === TILE_TYPES.EVENT) bg = 'bg-pink-500';
+                      else if (tile === TILE_TYPES.ENEMY) bg = 'bg-red-500';
+                      return <div key={`${x}-${y}`} className={`${bg} aspect-square`} />;
+                    })
+                  )}
+                </div>
+              </div>
+            )}
+
             {saveGames.length > 0 && (
               <div>
                 <h3 className="font-bold mb-1 text-gray-400">Saved Games</h3>
