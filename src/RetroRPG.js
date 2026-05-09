@@ -1138,13 +1138,17 @@ const RetroRPG = () => {
       <div className="flex-grow flex flex-col md:flex-row overflow-hidden">
         {/* Game display */}
         <div className="flex-grow flex flex-col items-center p-4">
-          {/* Scene image */}
-          <div className="w-full max-w-xl h-64 mb-4 bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
-            <img 
-              src="/api/placeholder/800/400" 
-              alt={currentScene}
-              className="w-full h-full object-cover"
-            />
+          {/* Scene placeholder — pure CSS so it works in production builds
+              (the previous /api/placeholder/* URL only resolved via the dev
+              proxy and 404'd as a broken image once deployed statically). */}
+          <div
+            role="img"
+            aria-label={`Scene: ${currentScene}`}
+            className="w-full max-w-xl h-64 mb-4 bg-gradient-to-br from-gray-700 to-gray-900 border border-gray-700 rounded-lg overflow-hidden flex items-center justify-center"
+          >
+            <span className="text-gray-400 text-sm uppercase tracking-widest">
+              {currentScene}
+            </span>
           </div>
           
           {/* Game log */}
